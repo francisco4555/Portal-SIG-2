@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal SIG</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body{height:100%;margin:0;font-family:Arial,sans-serif}
+#contenedor{display:flex;height:100vh}
+#panel{width:260px;padding:18px;box-sizing:border-box;background:#fff;box-shadow:2px 0 8px rgba(0,0,0,.15);z-index:1000}
+#panel h1{margin:0 0 8px;color:#17324d}
+.capa-item{display:flex;gap:8px;align-items:center;margin:14px 0}
+#estado{margin-top:16px;padding:10px;background:#eef3f7;border-radius:6px;font-size:13px}
+#mapa{flex:1;height:100%}
+@media(max-width:700px){
+#contenedor{flex-direction:column}
+#panel{width:100%}
+#mapa{height:calc(100vh - 210px)}
+}
+</style>
+</head>
+<body>
+<div id="contenedor">
+<aside id="panel">
+<h1>Portal SIG</h1>
+<p>Activa o desactiva la capa geográfica.</p>
+<label class="capa-item">
+<input type="checkbox" id="chkCapa" checked>
+<span>Mostrar shapefile</span>
+</label>
+<div id="estado">Cargando capa...</div>
+</aside>
+<main id="mapa"></main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
+<script>
+const mapa=L.map("mapa").setView([19.4326,-99.1332],10);
+
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+maxZoom:19,
+attribution:"&copy; OpenStreetMap"
+}).addTo(mapa);
+
+const archivoSHP="capa_leaflet.zip";
+let capaShapefile=null;
+
+shp(archivoSHP).then(function(datos){
+const colecciones=Array.isArray(datos)?datos:[datos];
+capaShapefile=L.featureGroup();
+
+colecciones.forEach(function(geojson){
+const capa=L.geoJSON(geojson,{
+style:function(){
+return{color:"#c62828",weight:2,fillColor:"#ff9800",fillOpacity:.45};
+},
+pointToLayer:function(feature,latlng){
+return L.circleMarker(latlng,{
+radius:6,color:"#c62828",weight:2,fillColor:"#ff9800",fillOpacity:.85
+});
+},
+onEachFeature:function(feature,layer){
+const props=feature.properties||{};
+const campos=Object.keys(props);
+let contenido="<strong>Información</strong><br>";
+if(campos.length===0){
+contenido+="Sin atributos";
+}else{
+campos.forEach(function(campo){
+contenido+="<strong>"+campo+":</strong> "+props[campo]+"<br>";
+});
+}
+layer.bindPopup(contenido);
+}
+});
+capaShapefile.addLayer(capa);
+});
+
+capaShapefile.addTo(mapa);
+
+if(capaShapefile.getBounds().isValid()){
+mapa.fitBounds(capaShapefile.getBounds(),{padding:[20,20]});
+}
+
+document.getElementById("estado").textContent=
+"Capa cargada. Usa la casilla para mostrarla u ocultarla.";
+}).catch(function(error){
+console.error(error);
+document.getElementById("estado").innerHTML=
+"No se pudo cargar <strong>capa_leaflet.zip</strong>. Verifica que esté junto a index.html.";
+document.getElementById("chkCapa").disabled=true;
+});
+
+document.getElementById("chkCapa").addEventListener("change",function(){
+if(!capaShapefile)return;
+if(this.checked){
+capaShapefile.addTo(mapa);
+document.getElementById("estado").textContent="Capa visible.";
+}else{
+mapa.removeLayer(capaShapefile);
+document.getElementById("estado").textContent="Capa oculta.";
+}
+});
+</script>
+</body>
+</html>
